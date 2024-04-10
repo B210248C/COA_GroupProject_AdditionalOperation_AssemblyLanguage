@@ -1,0 +1,143 @@
+section .data
+    enter_first_digit db "Enter number 1: ", 0		; Prompt for the first number
+    length_of_first_digit equ $ - enter_first_digit	; Length of the prompt
+    enter_second_digit db "Enter number 2: ", 0		; Prompt for the second number
+    length_of_second_digit equ $ - enter_second_digit
+    result_of_sum db "The sum of two numbers: ", 0	; Message for the result
+    length_of_result equ $ - result_of_sum		; Length of the message
+    nextline db 0xA					; Newline character
+    length_for_nextline equ $ - nextline		; Length of newline character
+ 
+section .bss
+    number1 resb 4		; Buffer to store the first number as ASCII
+    number2 resb 4  		; Buffer to store the converted numerical value of the first digit
+    number3 resb 4		; Buffer to store the second number as ASCII
+    number4 resb 4  		; Buffer to store the converted numerical value of the second digit
+    sum_result resb 4  		; Buffer to store the result as ASCII characters
+    convert_ASCII resb 4 	; Buffer to store ASCII characters during conversion
+ 
+section .text
+    global _start
+ 
+_start:
+    mov ecx, enter_first_digit		; Load address of the first prompt
+    mov edx, length_of_first_digit	; Load length of the first prompt
+    mov eax, 4				; System call for sys_write
+    mov ebx, 1				; File descriptor for standard output
+    int 80h				; Call kernel
+
+    mov eax, 3				; System call for sys_read
+    mov ebx, 0				; File descriptor for standard input
+    mov ecx, number1			; Buffer to store user input
+    mov edx, 4				; Maximum number of bytes to read
+    int 80h
+ 
+    ; Check if the first number is one digit or two digits
+    movzx eax, byte [number1 + 1]   	; Check the second byte of user input
+    cmp al, 10                   	; Check if it's a newline character
+    je single_digit             	; If it's not a newline, it's a single digit
+    jmp second_digit 	
+
+single_digit:
+    movzx eax, byte [number1]       	; Load the first byte of user input
+    sub eax, '0' 			; Convert ASCII character to numerical value
+    push eax				; Push the numerical value onto the stack
+    jmp second_part
+
+second_digit:	
+    ; Convert the first byte to numerical value and multiply by 10
+    movzx eax, byte [number1]       	; Load the first byte of user input
+    sub eax, '0'                 	; Convert ASCII character to numerical value
+    mov [number2], eax              	; Store the numerical value in number2
+    mov eax, dword [number2]        	; Load the numerical value back into eax
+    imul eax, eax, 10            	; Multiply by 10
+ 
+    ; Convert the second byte to numerical value and add it
+    movzx ebx, byte [number1 + 1]   	; Load the second byte of user input
+    sub ebx, '0'                 	; Convert ASCII character to numerical value
+    add eax, ebx                 	; Add it to the first byte's numerical value  
+ 
+    ; Push the numerical value onto the stack
+    push eax 
+    jmp second_part    
+
+ 
+second_part:    
+    mov ecx, enter_second_digit
+    mov edx, length_of_second_digit
+    mov eax, 4
+    mov ebx, 1
+    int 80h
+
+    mov eax, 3
+    mov ebx, 0
+    mov ecx, number3
+    mov edx, 4
+    int 80h
+
+    ; Check if the first number is one digit or two digits
+    movzx eax, byte [number3 + 1]   
+    cmp al, 10                  
+    je first_digit             
+    jmp two_digit
+ 
+first_digit:
+    movzx eax, byte [number3]      
+    sub eax, '0' 
+    pop ebx					; Pop the first digit from the stack
+    add eax, ebx				; Add the first digit's numerical value
+    jmp last_here
+ 
+two_digit:
+    ; Convert the first digit to numerical value and multiply by 10
+    movzx eax, byte [number3]      
+    sub eax, '0'                 
+    mov [number4], eax              
+    mov eax, dword [number4]        
+    imul eax, eax, 10            
+ 
+    ; Convert the second digit to numerical value and add it
+    movzx ebx, byte [number3 + 1]   
+    sub ebx, '0'                 
+    add eax, ebx  
+    ; Pop the previous numerical value from the stack and add it to eax
+    pop ebx
+    add eax, ebx
+    jmp last_here 
+        
+last_here:  	
+    mov esi, convert_ASCII		; Load address of the buffer to store ASCII characters
+    mov ecx, 10				; Load divisor for division operation
+
+loop_to_convertASCII:
+    ; Divide eax by 10 to extract each digit
+    xor edx, edx        		; Clear edx for division
+    div ecx             		; Divide eax by 10, quotient in eax, remainder in edx
+    add dl, '0'         		; Convert the remainder to ASCII
+    mov [esi], dl       		; Store the ASCII digit in convert_ASCII
+    dec esi             		; Move to the next byte in convert_ASCII
+    test eax, eax       		; Check if eax is zero
+    jnz loop_to_convertASCII        	; If not zero, continue the loop
+
+    mov ecx, result_of_sum		; Load address of the result message
+    mov edx, length_of_result		; Load length of the result message
+    mov eax, 4
+    mov ebx, 1
+    int 80h
+
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, esi
+    mov edx, 4
+    int 80h
+
+    ; Print newline
+    mov eax, 4              
+    mov ebx, 1              
+    mov ecx, nextline        		; Load address of the newline character
+    mov edx, length_for_nextline 		; Length of the newline character
+    int 80h     
+ 
+    mov eax, 1				;System call for sys_exit
+    xor ebx, ebx
+    int 80h
